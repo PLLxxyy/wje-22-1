@@ -64,4 +64,16 @@ db.exec(`
   )
 `)
 
+// Status change logs table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS status_change_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    property_id INTEGER NOT NULL,
+    old_status TEXT NOT NULL,
+    new_status TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (property_id) REFERENCES properties(id)
+  )
+`)
+
 console.log('Database initialized successfully')

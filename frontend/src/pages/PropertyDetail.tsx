@@ -4,15 +4,16 @@ import api from '@/utils/api'
 import PropertyForm from '@/components/PropertyForm'
 import NoteForm from '@/components/NoteForm'
 import StatusBadge from '@/components/StatusBadge'
-import { Property, ViewingNote, PropertyStatus } from '@/types'
-import { ArrowLeft, Trash2, Edit, Star, Calendar, Phone, User, FileText, Building2 } from 'lucide-react'
-import { formatCurrency } from '@/utils/format'
+import { Property, ViewingNote, PropertyStatus, StatusChangeLog } from '@/types'
+import { ArrowLeft, Trash2, Edit, Star, Calendar, Phone, User, FileText, Building2, History } from 'lucide-react'
+import { formatCurrency, STATUS_LABELS, STATUS_COLORS } from '@/utils/format'
 
 export default function PropertyDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [property, setProperty] = useState<Property | null>(null)
   const [notes, setNotes] = useState<ViewingNote[]>([])
+  const [statusLogs, setStatusLogs] = useState<StatusChangeLog[]>([])
   const [editing, setEditing] = useState(false)
   const [showNoteForm, setShowNoteForm] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -20,12 +21,14 @@ export default function PropertyDetail() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [propRes, notesRes] = await Promise.all([
+        const [propRes, notesRes, logsRes] = await Promise.all([
           api.get(`/properties/${id}`),
-          api.get(`/properties/${id}/notes`)
+          api.get(`/properties/${id}/notes`),
+          api.get(`/properties/${id}/status-logs`)
         ])
         setProperty(propRes.data)
         setNotes(notesRes.data)
+        setStatusLogs(logsRes.data)
       } finally {
         setLoading(false)
       }
@@ -37,6 +40,8 @@ export default function PropertyDetail() {
     const res = await api.put(`/properties/${id}`, data)
     setProperty(res.data)
     setEditing(false)
+    const logsRes = await api.get(`/properties/${id}/status-logs`)
+    setStatusLogs(logsRes.data)
   }
 
   const handleDelete = async () => {
@@ -60,6 +65,8 @@ export default function PropertyDetail() {
   const handleStatusChange = async (status: PropertyStatus) => {
     const res = await api.put(`/properties/${id}`, { status })
     setProperty(res.data)
+    const logsRes = await api.get(`/properties/${id}/status-logs`)
+    setStatusLogs(logsRes.data)
   }
 
   if (loading) return <div className="text-center py-20 text-gray-500">加载中...</div>
@@ -169,6 +176,40 @@ export default function PropertyDetail() {
           </div>
         </div>
       )}
+
+      {/* Status Change Logs */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2 mb-4">
+          <History className="w-5 h-5 text-indigo-500" />
+          状态变更日志
+        </h2>
+        <div className="space-y-3">
+          {statusLogs.map(log => (
+            <div key={log.id} className="bg-white rounded-lg border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-500">
+                  {new Date(log.createdAt).toLocaleString('zh-CN')}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[log.oldStatus] || 'bg-gray-100 text-gray-600'}`}>
+                  {STATUS_LABELS[log.oldStatus] || log.oldStatus}
+                </span>
+                <span className="text-gray-400">→</span>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[log.newStatus] || 'bg-gray-100 text-gray-600'}`}>
+                  {STATUS_LABELS[log.newStatus] || log.newStatus}
+                </span>
+              </div>
+            </div>
+          ))}
+          {statusLogs.length === 0 && (
+            <div className="text-center py-12 text-gray-400">
+              <History className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+              <p>暂无状态变更记录</p>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Viewing Notes */}
       <div>

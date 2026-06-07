@@ -96,11 +96,25 @@ router.post('/', (req: any, res) => {
 router.put('/:id', (req: any, res) => {
   const { address, area, rent, layout, size, photos, landlordName, landlordPhone, status, notes } = req.body
 
+  const oldProperty: any = db.prepare(
+    'SELECT * FROM properties WHERE id = ? AND user_id = ?'
+  ).get(req.params.id, req.userId)
+
+  if (!oldProperty) return res.status(404).json({ error: '房源不存在' })
+
+  const newStatus = status || 'viewing'
+  if (oldProperty.status !== newStatus) {
+    db.prepare(`
+      INSERT INTO status_change_logs (property_id, old_status, new_status)
+      VALUES (?, ?, ?)
+    `).run(req.params.id, oldProperty.status, newStatus)
+  }
+
   db.prepare(`
     UPDATE properties SET
     address = ?, area = ?, rent = ?, layout = ?, size = ?, photos = ?, landlord_name = ?, landlord_phone = ?, status = ?, notes = ?
     WHERE id = ? AND user_id = ?
-  `).run(address, area, rent, layout, size || null, photos || null, landlordName || null, landlordPhone || null, status || 'viewing', notes || null, req.params.id, req.userId)
+  `).run(address, area, rent, layout, size || null, photos || null, landlordName || null, landlordPhone || null, newStatus, notes || null, req.params.id, req.userId)
 
   const property: any = db.prepare('SELECT * FROM properties WHERE id = ?').get(req.params.id)
   res.json({
@@ -123,6 +137,7 @@ router.put('/:id', (req: any, res) => {
 router.delete('/:id', (req: any, res) => {
   db.prepare('DELETE FROM viewing_notes WHERE property_id = ?').run(req.params.id)
   db.prepare('DELETE FROM reminders WHERE property_id = ?').run(req.params.id)
+  db.prepare('DELETE FROM status_change_logs WHERE property_id = ?').run(req.params.id)
   db.prepare('DELETE FROM properties WHERE id = ? AND user_id = ?').run(req.params.id, req.userId)
   res.json({ success: true })
 })
@@ -169,6 +184,19 @@ router.post('/:id/notes', (req: any, res) => {
     content: note.content,
     createdAt: note.created_at
   })
+})
+
+router.get('/:id/status-logs', (req: any, res) => {
+  const logs = db.prepare(
+    'SELECT * FROM status_change_logs WHERE property_id = ? ORDER BY created_at DESC'
+  ).all(req.params.id)
+  res.json(logs.map((l: any) => ({
+    id: l.id,
+    propertyId: l.property_id,
+    oldStatus: l.old_status,
+    newStatus: l.new_status,
+    createdAt: l.created_at
+  })))
 })
 
 export default router

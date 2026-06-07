@@ -45,3 +45,11 @@ export interface Reminder {
   active: boolean
   createdAt: string
 }
+
+export interface StatusChangeLog {
+  id: number
+  propertyId: number
+  oldStatus: PropertyStatus
+  newStatus: PropertyStatus
+  createdAt: string
+}
